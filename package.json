@@ -1,0 +1,147 @@
+{
+  "name": "CodeExporter",
+  "displayName": "CodeExporter",
+  "description": "Export code files to markdown with tree structure",
+  "version": "0.0.1",
+  "publisher": "jin-taiyu",
+  "engines": {
+    "vscode": "^1.96.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onView:codeExporterTree"
+  ],
+  "main": "./out/extension.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jin-taiyu/CodeExporter.git"
+  },
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "codeExporter",
+          "title": "Code Exporter",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "codeExporter": [
+        {
+          "id": "codeExporterTree",
+          "name": "Files to Export",
+          "contextualTitle": "Code Exporter"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "codeExporter.export",
+        "title": "Export Code to Markdown",
+        "category": "Code Exporter",
+        "icon": "$(export)"
+      },
+      {
+        "command": "codeExporter.refresh",
+        "title": "Refresh File Tree",
+        "category": "Code Exporter",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "codeExporter.selectAll",
+        "title": "Select All",
+        "category": "Code Exporter",
+        "icon": "$(check-all)"
+      },
+      {
+        "command": "codeExporter.deselectAll",
+        "title": "Deselect All",
+        "category": "Code Exporter",
+        "icon": "$(close-all)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "codeExporter.export",
+          "when": "view == codeExporterTree",
+          "group": "navigation@1"
+        },
+        {
+          "command": "codeExporter.selectAll",
+          "when": "view == codeExporterTree",
+          "group": "navigation@2"
+        },
+        {
+          "command": "codeExporter.deselectAll",
+          "when": "view == codeExporterTree",
+          "group": "navigation@3"
+        },
+        {
+          "command": "codeExporter.refresh",
+          "when": "view == codeExporterTree",
+          "group": "navigation@4"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Code Exporter",
+      "properties": {
+        "codeExporter.outputPath": {
+          "type": "string",
+          "default": "",
+          "description": "Default path for exported markdown files"
+        },
+        "codeExporter.includeHidden": {
+          "type": "boolean",
+          "default": false,
+          "description": "Include hidden files in the tree view"
+        },
+        "codeExporter.excludePattern": {
+          "type": "string",
+          "default": "**/node_modules/**,**/.git/**",
+          "description": "Glob pattern for files to exclude"
+        },
+        "codeExporter.defaultLanguageMap": {
+          "type": "object",
+          "default": {
+            ".ts": "typescript",
+            ".js": "javascript",
+            ".py": "python",
+            ".java": "java",
+            ".cpp": "cpp",
+            ".c": "c",
+            ".html": "html",
+            ".css": "css",
+            ".json": "json",
+            ".md": "markdown",
+            ".sh": "bash"
+          },
+          "description": "Map file extensions to markdown language identifiers"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.96.0",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "20.x",
+    "@typescript-eslint/eslint-plugin": "^8.17.0",
+    "@typescript-eslint/parser": "^8.17.0",
+    "eslint": "^9.16.0",
+    "typescript": "^5.7.2",
+    "@vscode/test-cli": "^0.0.10",
+    "@vscode/test-electron": "^2.4.1"
+  }
+}
