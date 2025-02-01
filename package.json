@@ -2,7 +2,7 @@
   "name": "CodeExporter",
   "displayName": "CodeExporter",
   "description": "Export code files to markdown with tree structure",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "publisher": "jin-taiyu",
   "engines": {
     "vscode": "^1.96.0"
@@ -17,6 +17,11 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/jin-taiyu/CodeExporter.git"
+  },
+  "icon": "media/marketplace/icon.png",
+  "galleryBanner": {
+    "color": "#C80000",
+    "theme": "dark"
   },
   "contributes": {
     "viewsContainers": {
