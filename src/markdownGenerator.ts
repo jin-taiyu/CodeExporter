@@ -41,42 +41,42 @@ export class MarkdownGenerator {
         return files;
     }
 
-    private async generateDirectoryTree(nodes: FileNode[], prefix: string = ''): Promise<string> {
-        let tree = '';
-        const sortedNodes = [...nodes].sort((a, b) => {
-            if (a.isDirectory && !b.isDirectory) return -1;
-            if (!a.isDirectory && b.isDirectory) return 1;
-            return a.label?.toString().localeCompare(b.label?.toString() || '') || 0;
-        });
-
-        for (let i = 0; i < sortedNodes.length; i++) {
-            const node = sortedNodes[i];
-            const isLast = i === sortedNodes.length - 1;
-            const marker = isLast ? '└── ' : '├── ';
-            const indent = prefix.replace('├── ', '│   ').replace('└── ', '    ');
-            
-            tree += `${prefix}${marker}${node.label}\n`;
-
-            if (node.isDirectory) {
-                const childNodes = await vscode.commands.executeCommand<FileNode[]>(
-                    'codeExporter.getChildren',
-                    node
-                );
-                if (childNodes && childNodes.length > 0) {
-                    tree += await this.generateDirectoryTree(
-                        childNodes,
-                        prefix + (isLast ? '    ' : '│   ')
-                    );
+    private generateDirectoryTreeFromFiles(files: string[]): string {
+        const tree: any = {};
+        const root = this.workspaceRoot;
+        files.forEach(filePath => {
+            const relative = path.relative(root, filePath);
+            const parts = relative.split(path.sep);
+            let node = tree;
+            parts.forEach(part => {
+                if (!node[part]) {
+                    node[part] = {};
                 }
-            }
+                node = node[part];
+            });
+        });
+        
+        function printTree(node: any, prefix: string = ''): string {
+            const keys = Object.keys(node).sort();
+            let output = '';
+            keys.forEach((key, index) => {
+                const isLast = index === keys.length - 1;
+                const marker = isLast ? '└── ' : '├── ';
+                output += prefix + marker + key + '\n';
+                const children = node[key];
+                if (Object.keys(children).length > 0) {
+                    const newPrefix = prefix + (isLast ? '    ' : '│   ');
+                    output += printTree(children, newPrefix);
+                }
+            });
+            return output;
         }
-        return tree;
+        return root + '\n' + printTree(tree);
     }
 
-    private async readFileContent(filePath: string): Promise<string> {
+    public async readFileContent(filePath: string): Promise<string> {
         try {
-            const content = await fs.promises.readFile(filePath, 'utf8');
-            return content.trimEnd();
+            return await fs.promises.readFile(filePath, 'utf-8');
         } catch (error) {
             vscode.window.showErrorMessage(`Error reading file ${filePath}: ${error}`);
             return '';
@@ -99,10 +99,8 @@ export class MarkdownGenerator {
             }
         }
 
-        // Add tree structure
         markdown += '#### Relative Directory Structure\n\n```\n';
-        markdown += this.workspaceRoot + '\n';
-        markdown += await this.generateDirectoryTree(selectedNodes);
+        markdown += this.generateDirectoryTreeFromFiles(Array.from(filesToProcess));
         markdown += '```\n\n';
 
         // Add file contents

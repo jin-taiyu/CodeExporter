@@ -1,17 +1,14 @@
 {
-  "name": "CodeExporter",
+  "name": "codeexporter",
   "displayName": "CodeExporter",
   "description": "Export code files to markdown with tree structure",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "publisher": "jin-taiyu",
   "engines": {
     "vscode": "^1.96.0"
   },
   "categories": [
     "Other"
-  ],
-  "activationEvents": [
-    "onView:codeExporterTree"
   ],
   "main": "./out/extension.js",
   "repository": {
@@ -42,12 +39,51 @@
         }
       ]
     },
+    "viewsWelcome": [
+      {
+        "view": "codeExporterTree",
+        "contents": "[Search & Select Files](command:codeExporter.searchFiles)\nSupports regex patterns (e.g., \\.ts$ for TypeScript files)"
+      }
+    ],
     "commands": [
+      {
+        "command": "codeExporter.searchFiles",
+        "title": "Search & Select Files",
+        "category": "Code Exporter",
+        "icon": "$(search)"
+      },
+      {
+        "command": "codeExporter.showInExplorer",
+        "title": "Show in File Explorer",
+        "category": "Code Exporter"
+      },
+      {
+        "command": "codeExporter.copyAbsolutePath",
+        "title": "Copy Absolute Path",
+        "category": "Code Exporter"
+      },
+      {
+        "command": "codeExporter.copyRelativePath",
+        "title": "Copy Relative Path",
+        "category": "Code Exporter"
+      },
+      {
+        "command": "codeExporter.selectMatched",
+        "title": "Select Matched Files",
+        "category": "Code Exporter",
+        "icon": "$(check-all)"
+      },
       {
         "command": "codeExporter.export",
         "title": "Export Code to Markdown",
         "category": "Code Exporter",
         "icon": "$(export)"
+      },
+      {
+        "command": "codeExporter.preview",
+        "title": "Preview File",
+        "category": "Code Exporter",
+        "icon": "$(preview)"
       },
       {
         "command": "codeExporter.refresh",
@@ -69,26 +105,58 @@
       }
     ],
     "menus": {
-      "view/title": [
+      "view/item/context": [
         {
-          "command": "codeExporter.export",
+          "command": "codeExporter.preview",
+          "when": "view == codeExporterTree && !viewItem.isDirectory",
+          "group": "inline"
+        },
+        {
+          "command": "codeExporter.showInExplorer",
           "when": "view == codeExporterTree",
           "group": "navigation@1"
         },
         {
-          "command": "codeExporter.selectAll",
+          "command": "codeExporter.copyAbsolutePath",
           "when": "view == codeExporterTree",
+          "group": "2@1"
+        },
+        {
+          "command": "codeExporter.copyRelativePath",
+          "when": "view == codeExporterTree",
+          "group": "2@2"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "codeExporter.searchFiles",
+          "when": "view == codeExporterTree",
+          "group": "navigation@1"
+        },
+        {
+          "command": "codeExporter.selectMatched",
+          "when": "view == codeExporterTree && codeExporter:hasSearchResults",
           "group": "navigation@2"
         },
         {
-          "command": "codeExporter.deselectAll",
+          "command": "codeExporter.export",
           "when": "view == codeExporterTree",
           "group": "navigation@3"
         },
         {
-          "command": "codeExporter.refresh",
+          "command": "codeExporter.selectAll",
           "when": "view == codeExporterTree",
           "group": "navigation@4"
+        },
+        {
+          "command": "codeExporter.deselectAll",
+          "when": "view == codeExporterTree",
+          "group": "navigation@5"
+        },
+        {
+          "command": "codeExporter.refresh",
+          "when": "view == codeExporterTree",
+          "group": "navigation@6"
         }
       ]
     },
@@ -109,6 +177,16 @@
           "type": "string",
           "default": "**/node_modules/**,**/.git/**",
           "description": "Glob pattern for files to exclude"
+        },
+        "codeExporter.searchPattern": {
+          "type": "string",
+          "default": "",
+          "description": "Current search pattern for filtering files"
+        },
+        "codeExporter.useRegex": {
+          "type": "boolean",
+          "default": false,
+          "description": "Use regular expressions for search"
         },
         "codeExporter.defaultLanguageMap": {
           "type": "object",

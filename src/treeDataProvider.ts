@@ -9,7 +9,7 @@ export class FileNode extends vscode.TreeItem {
         public isSelected: boolean = false
     ) {
         super(resourceUri, collapsibleState);
-        this.contextValue = isSelected ? 'selected' : 'unselected';
+        this.contextValue = this.isDirectory ? 'directory' : (isSelected ? 'selected' : 'unselected');
         this.label = path.basename(resourceUri.fsPath);
         this.description = this.isDirectory ? '' : path.extname(resourceUri.fsPath).slice(1);
         this.tooltip = this.resourceUri.fsPath;
@@ -41,13 +41,91 @@ export class FileNode extends vscode.TreeItem {
     }
 }
 
+interface FileInfo {
+    path: string;
+    isDirectory: boolean;
+    children?: FileInfo[];
+}
+
 export class FileExplorerProvider implements vscode.TreeDataProvider<FileNode> {
     private _onDidChangeTreeData: vscode.EventEmitter<FileNode | undefined | null | void> = new vscode.EventEmitter<FileNode | undefined | null | void>();
     readonly onDidChangeTreeData: vscode.Event<FileNode | undefined | null | void> = this._onDidChangeTreeData.event;
 
     private selectedNodes: Map<string, FileNode> = new Map();
+    private searchPattern: string = '';
+    private _onDidChangeHasSearchResults = new vscode.EventEmitter<boolean>();
+    readonly onDidChangeHasSearchResults = this._onDidChangeHasSearchResults.event;
+    private fileStructure: Map<string, FileInfo> = new Map();
 
     constructor(private workspaceRoot: string | undefined) {}
+
+    setSearchPattern(pattern: string) {
+        this.searchPattern = pattern;
+        this.fileStructure.clear();
+        if (pattern.startsWith('*.')) {
+            this.buildFileStructure(this.workspaceRoot);
+        }
+        this.refresh();
+    }
+
+    private matchesPattern(filePath: string): boolean {
+        if (!this.searchPattern || !this.searchPattern.startsWith('*.')) {
+            return false;
+        }
+
+        const extension = path.extname(filePath);
+        return extension === this.searchPattern.slice(1);
+    }
+
+    private async buildFileStructure(rootPath: string | undefined): Promise<void> {
+        if (!rootPath) {
+            return;
+        }
+
+        try {
+            const files = await fs.promises.readdir(rootPath);
+            
+            for (const file of files) {
+                const filePath = path.join(rootPath, file);
+                const stat = await fs.promises.stat(filePath);
+
+                // Skip hidden files and excluded patterns
+                const config = vscode.workspace.getConfiguration('codeExporter');
+                const includeHidden = config.get<boolean>('includeHidden', false);
+                const excludePattern = config.get<string>('excludePattern', '**/node_modules/**,**/.git/**');
+                const exclude = excludePattern.split(',');
+
+                if ((!includeHidden && file.startsWith('.')) || 
+                    exclude.some(pattern => {
+                        const normalizedPattern = pattern.trim();
+                        return filePath.includes(normalizedPattern.replace(/^\*\*\//, '').replace(/\/\*\*$/, ''));
+                    })) {
+                    continue;
+                }
+
+                const fileInfo: FileInfo = {
+                    path: filePath,
+                    isDirectory: stat.isDirectory(),
+                    children: []
+                };
+
+                if (stat.isDirectory()) {
+                    await this.buildFileStructure(filePath);
+                } else if (this.matchesPattern(filePath)) {
+                    // If the file matches, create and select the node
+                    const uri = vscode.Uri.file(filePath);
+                    const node = new FileNode(uri, vscode.TreeItemCollapsibleState.None, true);
+                    this.selectedNodes.set(filePath, node);
+                }
+
+                this.fileStructure.set(filePath, fileInfo);
+            }
+
+            this._onDidChangeHasSearchResults.fire(this.selectedNodes.size > 0);
+        } catch (error) {
+            vscode.window.showErrorMessage(`Error building file structure: ${error}`);
+        }
+    }
 
     refresh(): void {
         this._onDidChangeTreeData.fire();
@@ -135,19 +213,21 @@ export class FileExplorerProvider implements vscode.TreeDataProvider<FileNode> {
 
     toggleSelection(node: FileNode): void {
         node.toggleSelection();
-        const path = node.resourceUri.fsPath;
+        const filePath = node.resourceUri.fsPath;
         
         if (node.isSelected) {
-            this.selectedNodes.set(path, node);
+            this.selectedNodes.set(filePath, node);
         } else {
-            this.selectedNodes.delete(path);
+            this.selectedNodes.delete(filePath);
         }
         
         this._onDidChangeTreeData.fire(node);
     }
 
     getSelectedNodes(): FileNode[] {
-        return Array.from(this.selectedNodes.values());
+        return Array.from(this.selectedNodes.values()).sort((a, b) => {
+            return a.resourceUri.fsPath.localeCompare(b.resourceUri.fsPath);
+        });
     }
 
     selectAll(): void {
@@ -168,19 +248,23 @@ export class FileExplorerProvider implements vscode.TreeDataProvider<FileNode> {
 
         const nodes = await this.getFiles(rootPath);
         for (const node of nodes) {
-            const path = node.resourceUri.fsPath;
+            const filePath = node.resourceUri.fsPath;
             node.isSelected = select;
             node.toggleSelection();
             
             if (select) {
-                this.selectedNodes.set(path, node);
+                this.selectedNodes.set(filePath, node);
             } else {
-                this.selectedNodes.delete(path);
+                this.selectedNodes.delete(filePath);
             }
 
             if (node.collapsibleState === vscode.TreeItemCollapsibleState.Collapsed) {
-                await this.traverseAndSelect(path, select);
+                await this.traverseAndSelect(filePath, select);
             }
         }
+    }
+
+    hasMatchedFiles(): boolean {
+        return this.selectedNodes.size > 0;
     }
 }

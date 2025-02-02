@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import * as path from 'path';
 import { FileExplorerProvider, FileNode } from './treeDataProvider';
 import { MarkdownGenerator } from './markdownGenerator';
 
@@ -29,8 +30,37 @@ export function activate(context: vscode.ExtensionContext) {
         canSelectMany: false
     });
 
+    // Create search box
+    let searchBox: vscode.InputBox;
+    const createSearchBox = () => {
+        searchBox = vscode.window.createInputBox();
+        searchBox.placeholder = "Enter file type (e.g., *.py for Python files)";
+        searchBox.prompt = "Type *.ext pattern to match files";
+        searchBox.onDidChangeValue(value => {
+            if (value.startsWith('*.')) {
+                fileExplorerProvider.setSearchPattern(value);
+            }
+        });
+        searchBox.onDidAccept(() => {
+            searchBox.hide();
+        });
+        searchBox.onDidHide(() => {
+            if (!searchBox.value) {
+                fileExplorerProvider.setSearchPattern('');
+            }
+        });
+        return searchBox;
+    };
+
     // Register Commands
     const commands = [
+        vscode.commands.registerCommand('codeExporter.searchFiles', () => {
+            if (!searchBox) {
+                searchBox = createSearchBox();
+            }
+            searchBox.show();
+        }),
+
         vscode.commands.registerCommand('codeExporter.refresh', () => {
             fileExplorerProvider.refresh();
         }),
@@ -63,6 +93,7 @@ export function activate(context: vscode.ExtensionContext) {
                     const defaultPath = config.get<string>('outputPath', '');
                     await markdownGenerator.saveMarkdown(markdown, defaultPath);
                     progress.report({ increment: 100 });
+                    fileExplorerProvider.deselectAll();
                 });
             } catch (error) {
                 vscode.window.showErrorMessage(`Export failed: ${error}`);
@@ -72,6 +103,23 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('codeExporter.getChildren', async (node: FileNode) => {
             const children = await fileExplorerProvider.getChildren(node);
             return children;
+        }),
+
+        vscode.commands.registerCommand('codeExporter.preview', async (node: FileNode) => {
+            if (!node || node.isDirectory) {
+                return;
+            }
+            
+            try {
+                const document = await vscode.workspace.openTextDocument(node.resourceUri);
+                await vscode.window.showTextDocument(document, {
+                    preview: true,
+                    preserveFocus: true,
+                    viewColumn: vscode.ViewColumn.One
+                });
+            } catch (error) {
+                vscode.window.showErrorMessage(`Error previewing file: ${error}`);
+            }
         }),
 
         vscode.commands.registerCommand('codeExporter.itemClick', (node: FileNode) => {
@@ -86,8 +134,37 @@ export function activate(context: vscode.ExtensionContext) {
                 // Toggle selection state regardless of directory/file
                 fileExplorerProvider.toggleSelection(node);
             }
+        }),
+
+        // Show in File Explorer
+        vscode.commands.registerCommand('codeExporter.showInExplorer', (node: FileNode) => {
+            if (node) {
+                vscode.commands.executeCommand('revealFileInOS', node.resourceUri);
+            }
+        }),
+
+        // Copy Absolute Path
+        vscode.commands.registerCommand('codeExporter.copyAbsolutePath', (node: FileNode) => {
+            if (node) {
+                vscode.env.clipboard.writeText(node.resourceUri.fsPath);
+                vscode.window.showInformationMessage('Absolute path copied to clipboard');
+            }
+        }),
+
+        // Copy Relative Path
+        vscode.commands.registerCommand('codeExporter.copyRelativePath', (node: FileNode) => {
+            if (node && workspaceRoot) {
+                const relativePath = path.relative(workspaceRoot, node.resourceUri.fsPath);
+                vscode.env.clipboard.writeText(relativePath);
+                vscode.window.showInformationMessage('Relative path copied to clipboard');
+            }
         })
     ];
+
+    // Listen for search results changes
+    fileExplorerProvider.onDidChangeHasSearchResults(hasResults => {
+        vscode.commands.executeCommand('setContext', 'codeExporter:hasSearchResults', hasResults);
+    });
 
     context.subscriptions.push(treeView, ...commands);
 }
